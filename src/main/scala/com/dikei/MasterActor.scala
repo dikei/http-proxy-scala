@@ -19,9 +19,14 @@ class MasterActor extends Actor{
 
   val janitor = context.actorOf(Janitor.props())
 
+  val port = 55555
+  val receiver = context.actorOf(Receiver.props(port))
+
   override def receive: Receive = {
     case Start =>
       logger.info("scala-proxy started")
+      receiver ! StartListening
+    case Shutdown =>
       janitor ! Shutdown
   }
 
