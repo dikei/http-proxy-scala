@@ -14,6 +14,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % "2.3.2",
   "org.slf4j" % "slf4j-api" % "1.7.7",
   "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
+  "org.apache.httpcomponents" % "httpcore" % "4.3.2",
   "ch.qos.logback" % "logback-classic" % "1.1.2" % "runtime"
 )
 
