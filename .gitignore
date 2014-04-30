@@ -1,0 +1,5 @@
+# Sbt file
+target/
+
+# IntelliJ project file
+.idea/
