@@ -9,4 +9,8 @@ object Main extends App {
   val masterActor = system.actorOf(MasterActor.props())
 
   masterActor ! Start
+
+  sys.addShutdownHook {
+    masterActor ! Shutdown
+  }
 }

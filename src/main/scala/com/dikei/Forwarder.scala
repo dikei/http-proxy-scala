@@ -35,6 +35,6 @@ class Forwarder(val clientSocket: Socket) extends Actor{
       writer.flush()
       input = reader.readLine()
     }
-    context.parent ! StopListening
+    context.stop(self)
   }
 }
