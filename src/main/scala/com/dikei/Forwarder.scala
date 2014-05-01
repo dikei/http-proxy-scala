@@ -9,7 +9,11 @@ import scala.util.{Failure, Success, Try}
 import dispatch._, Defaults._
 import org.apache.http.message.BasicHttpResponse
 import scala.collection.JavaConversions._
-import org.apache.http.{HttpRequest, Header, RequestLine}
+import org.apache.http._
+import org.apache.http.impl.{DefaultBHttpServerConnection, DefaultBHttpClientConnection}
+import scala.util.Success
+import scala.util.Failure
+import org.apache.http.entity.InputStreamEntity
 
 case object StartProcessing
 
@@ -23,17 +27,10 @@ object Forwarder {
 class Forwarder(val clientSocket: Socket) extends Actor{
 
   val logger = Logging(context.system, this)
-  val parserFactory = new DefaultHttpRequestParserFactory()
-  val writerFactory = new DefaultHttpResponseWriterFactory()
-  val bufferSize = 10 * 1024 * 1024
-  
-  val outBuffer = new SessionOutputBufferImpl(new HttpTransportMetricsImpl, bufferSize)
-  outBuffer.bind(clientSocket.getOutputStream)
 
-  val inBuffer = new SessionInputBufferImpl(new HttpTransportMetricsImpl, bufferSize)
-  inBuffer.bind(clientSocket.getInputStream)
-  val parser = parserFactory.create(inBuffer, MessageConstraints.DEFAULT)
-
+  val bufferSize = 512 * 1024
+  val connection = new DefaultBHttpServerConnection(bufferSize)
+  connection.bind(clientSocket)
 
   override def receive: Receive = {
     case StartProcessing =>
@@ -42,24 +39,20 @@ class Forwarder(val clientSocket: Socket) extends Actor{
 
   def process() = {
     val request = Try {
-      parser.parse()
+      connection.receiveRequestHeader()
     }
 
     request match {
-      case Success(r) =>
-        val headers = r.getAllHeaders
-        val requestLine = r.getRequestLine
-        val method = requestLine.getMethod.toLowerCase
-
-        logger.info("Request method: {}", method)
-        method match {
-          case "get" =>
-            getProxy(requestLine, headers)
-          case _ =>
-            logger.info("Unsupported method: {}", method)
-            context.stop(self)
-        }
-
+      case Success(r: HttpEntityEnclosingRequest) =>
+        val method = r.getRequestLine.getMethod.toLowerCase
+        logger.info("Request url: {}", r.getRequestLine.getUri)
+        logger.info("Request method with entity: {}", method)
+        context.stop(self)
+      case Success(r: HttpRequest) =>
+        val method = r.getRequestLine.getMethod.toLowerCase
+        logger.info("Request url: {}", r.getRequestLine.getUri)
+        logger.info("Request method without entity method: {}", method)
+        nonEntityProxy(r)
       case Failure(e) =>
         logger.debug("Invalid request")
         context.stop(self)
@@ -67,10 +60,9 @@ class Forwarder(val clientSocket: Socket) extends Actor{
 
   }
 
-  private def getProxy(requestLine: RequestLine, headers: Array[Header]) {
-    val writer = Try {
-      writerFactory.create(outBuffer)
-    }
+  private def nonEntityProxy(r: HttpRequest) {
+    val requestLine = r.getRequestLine
+    val headers = r.getAllHeaders
 
     val request = url(requestLine.getUri)
     for (header <- headers) {
@@ -93,24 +85,17 @@ class Forwarder(val clientSocket: Socket) extends Actor{
         } {
           response.setHeader(key, value)
         }
+        response.setEntity(new InputStreamEntity(resp.getResponseBodyAsStream))
 
-        writer.foreach { w =>
-          //Write the header
-          w.write(response)
-          //Write the body of the response
-          outBuffer.write(resp.getResponseBodyAsBytes)
-          context.stop(self)
-        }
+        //Write the header
+        connection.sendResponseHeader(response)
+        connection.sendResponseEntity(response)
       case Failure(e) =>
-        writer.foreach { w =>
-          w.write(new BasicHttpResponse(requestLine.getProtocolVersion, 500, "Unable to proxy request"))
-        }
         context.stop(self)
     }
   }
 
   override def postStop() {
-    outBuffer.flush()
-    clientSocket.close()
+    connection.close()
   }
 }
