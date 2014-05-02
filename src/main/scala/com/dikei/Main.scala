@@ -28,7 +28,7 @@ object Main extends App {
   }
 
   val logger = LoggerFactory.getLogger(this.getClass)
-  
+
   val system = ActorSystem("scala-proxy")
 
   val masterActor = system.actorOf(MasterActor.props(port.toInt))
