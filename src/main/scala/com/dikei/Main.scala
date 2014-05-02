@@ -5,6 +5,9 @@ import java.io.{FileInputStream, FileOutputStream, IOException}
 import scala.util.{Try, Success, Failure}
 import java.util.Properties
 import scala.collection.immutable.Range.Int
+import dispatch.Http
+import akka.event.Logging
+import org.slf4j.LoggerFactory
 
 object Main extends App {
 
@@ -24,13 +27,17 @@ object Main extends App {
       DEFAULT_PORT
   }
 
+  val logger = LoggerFactory.getLogger(this.getClass)
+  
   val system = ActorSystem("scala-proxy")
 
   val masterActor = system.actorOf(MasterActor.props(port.toInt))
-
   masterActor ! Start
 
   sys.addShutdownHook {
-    masterActor ! Shutdown
+    logger.info("Starting cleanup process")
+    Http.shutdown()
+    system.shutdown()
+    logger.info("Shutdown complete")
   }
 }
