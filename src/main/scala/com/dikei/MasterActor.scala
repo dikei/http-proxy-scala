@@ -7,19 +7,18 @@ case object Start
 case object Shutdown
 
 object MasterActor {
-  def props() = Props(classOf[MasterActor])
+  def props(port: Int) = Props(classOf[MasterActor], port)
 }
 
 /**
  * The top level actor of the program
  */
-class MasterActor extends Actor{
+class MasterActor(val port: Int) extends Actor{
 
   val logger = Logging(context.system, this)
 
   val janitor = context.actorOf(Janitor.props())
 
-  val port = 55555
   val receiver = context.actorOf(Receiver.props(port))
 
   override def receive: Receive = {
