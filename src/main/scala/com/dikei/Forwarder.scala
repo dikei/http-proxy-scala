@@ -48,16 +48,33 @@ class Forwarder(val clientSocket: Socket) extends Actor{
 
     request match {
       case Success(r: HttpEntityEnclosingRequest) =>
-        val method = r.getRequestLine.getMethod
+        val method = r.getRequestLine.getMethod.toLowerCase
         logger.info("Request url: {}", r.getRequestLine.getUri)
         logger.info("Request method with entity: {}", method)
-        connection.receiveRequestEntity(r)
+        method match {
+          case "post" =>
+            entityProxy(r)
+          case "put" =>
+            entityProxy(r)
+          case _ =>
+            logger.info("Method not supported: {}", method)
+            context.stop(self)
+        }
+
         entityProxy(r)
       case Success(r: HttpRequest) =>
-        val method = r.getRequestLine.getMethod
+        val method = r.getRequestLine.getMethod.toLowerCase
         logger.info("Request url: {}", r.getRequestLine.getUri)
         logger.info("Request method without entity: {}", method)
-        nonEntityProxy(r)
+        method match {
+          case "head" =>
+            nonEntityProxy(r)
+          case "get" =>
+            nonEntityProxy(r)
+          case _ =>
+            logger.info("Method not supported: {}", method)
+            context.stop(self)
+        }
       case Failure(e) =>
         logger.debug("Invalid request")
         context.stop(self)
@@ -93,6 +110,8 @@ class Forwarder(val clientSocket: Socket) extends Actor{
     var builder = url(requestLine.getUri)
     builder = builder.setMethod(requestLine.getMethod.toUpperCase)
     builder = builder.setMethod(requestLine.getMethod.toUpperCase)
+
+    connection.receiveRequestEntity(r)
     builder = builder.underlying {
       _.setBody(new InputStreamBodyGenerator(r.getEntity.getContent))
     }
