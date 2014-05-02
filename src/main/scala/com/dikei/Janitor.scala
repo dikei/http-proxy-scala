@@ -2,6 +2,7 @@ package com.dikei
 
 import akka.actor.{Props, Actor}
 import akka.event.Logging
+import dispatch.Http
 
 object Janitor {
   def props() = Props(classOf[Janitor])
@@ -18,6 +19,7 @@ class Janitor extends Actor {
     case Shutdown =>
       logger.info("Starting cleanup process")
       context.system.shutdown()
+      Http.shutdown()
       logger.info("Shutdown complete")
   }
 }
